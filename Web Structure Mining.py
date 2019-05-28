@@ -15,19 +15,23 @@ def simplifiedURL(url):
     asumsi: alamat url tidak mengandung http(s) (misalnya "true-http-website.com"
             atau www (misalnya "true-www-website.com")
     '''
+    try:
     # cek 1 : www
-    if "www." in url:
-        ind = url.index("www.")+4
-        url = "http://"+url[ind:]
-    # cek 3 : tanda / di akhir
-    if url[-1] == "/":
-        url = url[:-1]
-    # Cek 4 : cuma domain utama
-    parts = url.split("/")
-    url = ''
-    for i in range(3):
-        url += parts[i] + "/"
-    return url
+        if "www." in url:
+            ind = url.index("www.")+4
+            url = url[ind:]
+        if "http" in url:
+            ind = url.index(":")+3
+            url = url[ind:]
+        # cek 3 : tanda / di akhir
+        if url[-1] == "/":
+            url = url[:-1]
+        # Cek 4 : cuma domain utama
+        parts = url.split("/")
+        url = parts[0]
+        return "http://"+url
+    except ValueError:
+        pass
 
 def crawl(url, max_deep,  show=False, deep=0, done=[]):
     # returnnya ada di edgelist, 
@@ -120,7 +124,15 @@ data = []
 for i, key in enumerate(nodelist):
     data.append((pr[key], key))
     label[key]=i
-    print(i, key, pr[key])
+
+
+urut = data.copy()
+for x in range(len(urut)):
+    for y in range(len(urut)):
+        if urut[x][0] > urut[y][0]:
+            urut[x],urut[y] = urut[y], urut[x]
+            
+urut = pd.DataFrame(urut, None, ("PageRank", "Node"))
 data = pd.DataFrame(data, None, ("PageRank", "Node"))
 
 # Draw Graph
