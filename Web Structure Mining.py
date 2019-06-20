@@ -1,6 +1,7 @@
 # For DataFrame Purpose
 import numpy as numpy
 import pandas as pd
+import sqlite3
 
 # For crawling purpose
 import requests
@@ -95,20 +96,34 @@ def getAllLinks(src):
         return list()
 
 # Inisialisasi variabel awal
+conn = sqlite3.connect('test.db')
 #root = "https://www.trunojoyo.ac.id/"
 root = "http://garuda.ristekdikti.go.id/"
 nodelist = [root]
 edgelist = []
+choice = input("Update data? Y/N").lower()
 
-#crawl
-crawl(root, 3, show=True)
+if choice == 'y':
+    conn.execute('drop table if exists edgelist')
+    conn.execute('''CREATE TABLE edgelist
+                 (src          TEXT     NOT NULL,
+                 dest         TEXT     NOT NULL);''')
+    #crawl
+    crawl(root, 3, show=True)
+    for edge in edgelist:
+        conn.execute("INSERT INTO edgelist \
+                        VALUES (?, ?)", (edge[0], edge[1]));
+    conn.commit()
+else:
+    cursor = conn.execute("SELECT * from edgelist")
+    cursor = cursor.fetchall()
+    if cursor.isEmpty(): raise sqlite3.Error("Database Kosong")
+    for row in cursor:
+        edgelist.append((row[0], row[1]))
 edgelistFrame = pd.DataFrame(edgelist, None, ("From", "To"))
 
 #membuat Graph
 g = nx.from_pandas_edgelist(edgelistFrame, "From", "To", None, nx.DiGraph())
-
-# deklarasi pos (koordinat) (otomatis)
-pos = nx.spring_layout(g)
 
 # hitung pagerank
 damping = 0.85
@@ -116,24 +131,34 @@ max_iterr = 100
 error_toleransi = 0.0001
 pr = nx.pagerank(g, alpha = damping, max_iter=max_iterr, tol=error_toleransi)
 
-# Membuat Label && print pagerank
-print("keterangan node:")
+# Creating Data Frame pagerank
 nodelist = g.nodes
-label= {}
 data = []
 for i, key in enumerate(nodelist):
     data.append((pr[key], key))
-    label[key]=i
 
-
-urut = data.copy()
-for x in range(len(urut)):
-    for y in range(len(urut)):
-        if urut[x][0] > urut[y][0]:
-            urut[x],urut[y] = urut[y], urut[x]
-            
-urut = pd.DataFrame(urut, None, ("PageRank", "Node"))
+# mengurutkan PageRank
+#urut = data.copy()
+for x in range(len(data)):
+    for y in range(len(data)):
+        if data[x][0] > data[y][0]:
+            data[x],data[y] = data[y], data[x]
+           
 data = pd.DataFrame(data, None, ("PageRank", "Node"))
+
+#buat graph baru dengan label yg sudah diurutkan
+g = nx.DiGraph()
+g.add_nodes_from(data.Node)
+g.add_edges_from(edgelist)
+#ibn 1010
+# deklarasi pos (koordinat) (otomatis)
+pos = nx.spring_layout(g)
+
+# Membuat Label && print pagerank
+nodelist = g.nodes
+label= {}
+for i, key in enumerate(nodelist):
+    label[key]=i
 
 # Draw Graph
 #plt.figure(1)
@@ -142,32 +167,6 @@ nx.draw(g, pos)
 nx.draw_networkx_labels(g, pos, label, font_color="b")
 
 # show figure
+print(data)
 plt.axis("off")
 plt.show()
-
-'''
-Documentasi di github. Lanjutin yang kemaren
-konfigurasi:
-    - Home
-    - Content mining
-    - Structure Mining
-Ini minggu depan
-
-url tergantung analisis. jika ttg domain per domain, cukup sampe ".com/". kalo sampe direktori, ya gpp, tapi bedal lagi
-Kalo LaTex ga nge load, tambahin mathjax di konfigurasi.
-
-selebihnya bahas soal tugas akhir. ampas
-    Pakai LaTeX untuk bikin rumus
-    Bingung bikin rumus pake LateX? pake Mathpix aja. Jalankan, trus ctrl+alt+m
-    ngetik di Tex Studio  ->> ini untuk bikin proposal juga. AMpas yg hqq
-
-Selayang pandang soal Tugas akhir.
-    Crawling->> plagiarism.
-        bisa lewat text
-            Kek yg kemaren
-        bisa lewat graph
-            dilihat struktur graphnya.
-            misal ada 3 kalimat, dipecah per kalimat. Node = kata atau apalah, lupa. dilihat strukturnya sama apa ngga.
-            anyway, di indo belum ada.
-    Apa kabar hoax? wkwk
-'''
